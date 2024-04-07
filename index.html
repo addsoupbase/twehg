@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<canvas id="canvas" width="0" height="0" color="#000000" style="border:3px solid #000000;"></canvas>
+<style type='text/css'>
+  html,
+  body,
+  canvas {
+    width: 100%;
+    height: 100%;
+    margin: 0px;
+    overflow: hidden;
+  }
+</style>
+<input type="text" id="evil"></input>
+<script src='./wpns.js'></script>
+<script src="./levels.js"></script>
+<script>
+  "use strict";
+  const colors = {
+    blue: '#2596be',
+    
+  }
+  let int = new timer(50)
+  var audios = {
+    start: new Audio(),
+    music: new Audio(),
+    music1: new Audio(),
+    music2: new Audio(),
+    music3: new Audio()
+  }
+  for (let audio in audios) {
+    switch(audio) {
+      case 'music':
+      audios[`${audio}`].src = './audio/loop.mp3'
+   //   audios[`${audio}`].loop = true;
+      break;
+      case 'start': 
+      audios[`${audio}`].src = './audio/start.mp3'
+      break;
+    }
+
+    audios[`${audio}`].preload = 'auto'
+  }
+  let s = function*() {
+    yield (()=>{
+      audios.start.play();
+    setTimeout(()=>{audios.music.play()},2140)
+    })()
+  
+  }()
+  let deaths = -1
+  //  window.onfocus = function() { window.location.reload()};
+  const canvas = document.getElementById('canvas')
+  const ctx = canvas.getContext("2d");
+  let text = ''
+  let currentLevel = 1;
+  let paused = false;
+  let runSpeed = 3;
+  let wallSize = 30
+  const messages = ['That was just practice','Bet you can\'t do this one', 'Dodgeball :)','What\'s this?']
+  let c = 0
+
+  const calc = {
+    ads: function (a, b) {
+      return Math.abs(a - b)
+    },
+    ds: function (a, b) {
+      return a - b
+    }
+  }
+
+  //this is what i use so i don't have to keep retyping stuff
+  const ran = {
+    choose: function (...a) {
+      return a[Math.floor(Math.random() * a.length)]
+    },
+    range: function (min, max) {
+      return Math.random() * (max - min) + min;
+    },
+    rangef: function (min, max) {
+      return Math.floor(Math.random() * (max - min)) + min
+    }
+  }
+
+  function toRad(angle) {
+    return angle * Math.PI / 180
+  }
+  //the shapes
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (!flags.started) {
+      return
+    }
+    player.fp.x = e.x
+    player.fp.y = e.y
+  })
+ 
+  document.addEventListener("keydown", (e) => {
+    if (!flags.started) {
+      return
+    }
+s.next()
+     if (e.key === 'Shift') {
+       player.invincible = !player.invincible
+     }
+     if (e.key === 'o') {
+      player.kill()
+     }
+     if (e.key === 'k') {
+      entity.clear(true)
+
+      level.next()
+      currentLevel++
+     }
+    if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp' && !e.repeat) {
+      player.moving[0] = true
+      player.moving[1] = false
+    }
+    if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown' && !e.repeat) {
+      player.moving[1] = true
+      player.moving[0] = false
+    }
+    if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight' && !e.repeat) {
+      player.moving[2] = true
+      player.moving[3] = false
+    }
+    if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft' && !e.repeat) {
+      player.moving[3] = true
+      player.moving[2] = false
+    }
+  });
+  document.addEventListener("keyup", (e) => {
+    if (!flags.started) {
+      return
+    }
+    if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') {
+      player.moving[0] = false
+    }
+    if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') {
+      player.moving[1] = false
+    }
+    if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') {
+      player.moving[3] = false
+    }
+    if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') {
+      player.moving[2] = false
+    }
+  });
+  let mousex, mousey = 0
+  /*canvas.addEventListener('mousemove',(e)=>{
+  
+    mousex=e.clientX
+    mousey=e.clientY
+     let diffx = player.x - mousex,
+     diffy = player.y - mousey
+    player.rot = -Math.atan2(diffx,diffy)
+  
+  })*/
+  const cwidth = 1366, cheight = 767
+  function update() {
+    let l = false;
+    if (audios.music.currentTime >= 60.22 ){
+      audios.music.currentTime = 0.12
+      audios.music.play() 
+
+    }
+    requestAnimationFrame(update)
+    /* let diffx = player.x - mousex,
+     diffy = player.y - mousey
+    player.rot = -Math.atan2(diffx,diffy)*/
+    canvas.height = window.innerHeight;
+    canvas.width = window.innerWidth;
+
+    if (!paused) {
+      ctx.clearRect(0, 0, cwidth, cheight);
+      if (currentLevel < 5) {
+        ctx.fillStyle = '#8f91ff';
+
+      }
+      ctx.fillRect(0, 0, cwidth, cheight);
+      ctx.font = "50px Sans-serif";
+      ctx.textAlign = "center";
+
+      ctx.fillStyle = '#000000'
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+     ctx.fillText(`Deaths: ${deaths}`, canvas.width - 160, canvas.height - 40);
+      if (entity.all.indexOf(player) !== entity.all.length - 1) {
+        entity.all.splice(entity.all.indexOf(player), 1)
+        entity.all.push(player)
+      }
+      for (let o of entity.tokill) {
+        // the last frame has ended, kill all that needs to be killed before we start drawing again!
+
+       if (entity.all.includes(o)) { entity.all.splice(entity.all.indexOf(o), 1);
+        entity.particles.push(o)
+}
+
+      }
+      entity.tokill = [] //then empty it
+
+      for (let o of entity.all) {
+        if (!o) {
+          continue;
+        }
+        for (let oo of o.guns) {
+          oo.fireTime++
+        }
+        o.draw() //and draw :)
+      
+      }
+      if (entity.all.includes(player) && !player.invuln) {
+l=true
+      }
+      if (!l) {
+        int.tick()
+      }
+      for (let o of entity.particles) {
+        if (o.o <= 0) {
+          entity.particles.splice(entity.particles.indexOf(o), 1);
+          o = null
+
+          continue
+        }
+        o.o--;
+        if (currentLevel === 5) {
+          o.size--
+          o.rot -= 0.1
+          o.fp.x+= o.velocity.x*5
+          o.fp.y+= o.velocity.y*5
+       
+        } else { o.size++ }
+        o.speed = 0
+        o.draw()
+      }
+    }
+    if (!l && flags.started) {
+      if (currentLevel === 5 && int.done) {
+        int.reset()
+        spawnPlayer(entity.startPos.x, entity.startPos.y)
+      }
+      if (currentLevel !== 5) {
+        spawnPlayer(entity.startPos.x, entity.startPos.y)
+      }
+    }
+    switch (currentLevel) {
+      case 5: {
+        if (gameStart) {
+
+          if (!flags.managerSpawned || !entity.all.some((o)=>{
+return o instanceof manager
+          })) {
+            let f = new manager(cwidth / 2, flags.init ? 101 : 0);
+            f.chosen = 3
+          }
+          if (flags.colorsNeeded > 0) {
+            if (player.x < 323 || player.x > 1020 || player.y < 140) {
+              player.kill()
+            }
+          }
+
+        } else {
+          player.fp.x = entity.startPos.x
+          player.fp.y = entity.startPos.y
+        }
+      }
+        break;
+    }
+  }
+
+  //x.lifetime = 4
+  function nextFrame() {
+    paused = false;
+    update()
+    paused = true;
+  }
+  let player
+
+  requestAnimationFrame(update)
+  function spawnPlayer(x, y) {
+    for (let o of entity.all) {
+      o.beforePlayerRespawn?.()
+    }
+    player = new entity(x, y, 13, 4)
+    deaths++
+    player.coinsNeeded = 0;
+    player.color = "#ff2323"
+    player.speed = 7.3
+    player.isPlayer = true
+    player.type = 'player'
+    buttonPressed = false
+    for (let o of entity.all) {
+      o.onPlayerRespawn?.()
+      if (o.goesBackToStart) {
+        o.fp.x = o.start.x
+        o.fp.y = o.start.y
+        o.rot = o.start.rot
+
+      }
+      if (o instanceof coin) {
+        o.o = 10;
+        o.invuln = false;
+        player.coinsNeeded++
+      }
+    }
+  }
+
+  //new button(100,200,20)
+  //new turret(100,100,15,'#Ff65e9',400)
+  //new box(250,250,20)
+
+  function d(e) {
+    try {
+      'use strict';
+      console.log(e)
+      eval(e)
+    }
+    catch (err) {
+      text = err
+    }
+  }
+  level.next()
+
+</script>
+<button onclick="d(document.getElementById('evil').value)">Eval</button>
