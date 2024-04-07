@@ -1,2 +1,2 @@
 # tpmdg
-the planet's most difficult game
+this is my first project lol it's not done like at all but i'm proud of it :)
