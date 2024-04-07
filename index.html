@@ -86,22 +86,22 @@
   }
   //the shapes
 
-  canvas.addEventListener('mousedown', (e) => {
+  /*canvas.addEventListener('mousedown', (e) => {
     if (!flags.started) {
       return
     }
     player.fp.x = e.x
     player.fp.y = e.y
-  })
+  })*/
  
   document.addEventListener("keydown", (e) => {
     if (!flags.started) {
       return
     }
 s.next()
-     if (e.key === 'Shift') {
+     /*if (e.key === 'Shift') {
        player.invincible = !player.invincible
-     }
+     }*/
      if (e.key === 'o') {
       player.kill()
      }
@@ -172,7 +172,7 @@ s.next()
 
     if (!paused) {
       ctx.clearRect(0, 0, cwidth, cheight);
-      if (currentLevel < 5) {
+      if (currentLevel < 6) {
         ctx.fillStyle = '#8f91ff';
 
       }
