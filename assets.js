@@ -338,7 +338,7 @@ class entity {
 class wall extends entity {
     constructor(x, y, size, shape) {
         super(x, y, size, shape)
-        if (currentLevel < 5) {
+        if (currentLevel < 6) {
             this.color = colors.blue
         }
     }
