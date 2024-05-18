@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<link href='https://fonts.googleapis.com/css?family=Lexend' rel='stylesheet'>
+<link rel="icon" type="image/x-icon" href="./favicon.ico">
+
 <canvas id="canvas" width="0" height="0" color="#000000" style="border:3px solid #000000;"></canvas>
 <style type='text/css'>
   html,
@@ -8,16 +11,65 @@
     height: 100%;
     margin: 0px;
     overflow: hidden;
+    position: fixed;
+    top: 0;
+    bottom: 0
+  }
+
+  #start {
+    z-index: 2;
+    font-size: 20px;
+    font-family: lexend;
+    text-align: center;
+    position: fixed;
+    display: inline;
+    text-align: center;
+    tab-size: 30px;
+    border-radius: 5px;
+  }
+
+  div {
+    display: inline;
+    text-align: center;
+    position: relative;
+    bottom: -50%;
+    left: 50%;
+    border-color: green;
+    border-radius: 30px
   }
 </style>
-<input type="text" id="evil"></input>
 <script src='./assets.js'></script>
 <script src="./levels.js"></script>
 <script>
   "use strict";
+  let Clicking = false,
+    clickTimer = new timer(2)
+  function StartGame() {
+    if (menu.started) {
+      return
+    }
+    menu.started = true;
+    entity.clear()
+    text = messages[c++]
+    audios.bell.play()
+
+    setTimeout(() => {
+      new checkPoint(600, 200, 50)
+
+      s.next()
+      text = ''
+      level.next()
+
+    }, 1000)
+
+  }
   const colors = {
     blue: '#2596be',
-    
+
+  }
+  let menu = {
+    started: false,
+    paused: false,
   }
   let int = new timer(50)
   var audios = {
@@ -25,27 +77,39 @@
     music: new Audio(),
     music1: new Audio(),
     music2: new Audio(),
-    music3: new Audio()
+    music3: new Audio(),
+    death: new Audio(),
+    ding: new Audio(),
+    bell: new Audio()
   }
-  for (let audio in audios) {
-    switch(audio) {
+  for (let audio of Object.keys(audios)) {
+    switch (audio) {
       case 'music':
-      audios[`${audio}`].src = './audio/loop.mp3'
-   //   audios[`${audio}`].loop = true;
-      break;
-      case 'start': 
-      audios[`${audio}`].src = './audio/start.mp3'
-      break;
+        audios[`${audio}`].src = './audio/loop.mp3'
+        //   audios[`${audio}`].loop = true;
+        break;
+      case 'start':
+        audios[`${audio}`].src = './audio/start.mp3'
+        break;
+      case 'death':
+        audios[`${audio}`].src = './audio/punch2.mp3'
+        break;
+      case 'ding':
+        audios[`${audio}`].src = './audio/ding.wav'
+        break;
+      case 'bell':
+        audios[`${audio}`].src = './audio/bell.wav'
+        break;
     }
 
     audios[`${audio}`].preload = 'auto'
   }
-  let s = function*() {
-    yield (()=>{
+  let s = function* () {
+    yield (() => {
       audios.start.play();
-    setTimeout(()=>{audios.music.play()},2140)
+      setTimeout(() => { audios.music.play() }, 2140)
     })()
-  
+
   }()
   let deaths = -1
   //  window.onfocus = function() { window.location.reload()};
@@ -56,7 +120,7 @@
   let paused = false;
   let runSpeed = 3;
   let wallSize = 30
-  const messages = ['That was just practice','Bet you can\'t do this one', 'Dodgeball :)','What\'s this?']
+  const messages = ['READY?', 'That was just practice', 'Bet you can\'t do this one', 'Dodgeball :)', 'What\'s this?']
   let c = 0
 
   const calc = {
@@ -86,31 +150,28 @@
   }
   //the shapes
 
-  /*canvas.addEventListener('mousedown', (e) => {
-    if (!flags.started) {
-      return
-    }
-    player.fp.x = e.x
-    player.fp.y = e.y
-  })*/
- 
+  canvas.addEventListener('mousedown', (e) => {
+    Clicking = true
+    //  player.fp.x = e.x
+    //player.fp.y = e.y
+  })
+
   document.addEventListener("keydown", (e) => {
     if (!flags.started) {
       return
     }
-s.next()
-     /*if (e.key === 'Shift') {
-       player.invincible = !player.invincible
-     }*/
-     if (e.key === 'o') {
+    /*if (e.key === 'Shift') {
+      player.invincible = !player.invincible
+    }*/
+    if (e.key === 'o') {
       player.kill()
-     }
-     if (e.key === 'k') {
+    }
+    if (e.key === 'k') {
       entity.clear(true)
 
       level.next()
       currentLevel++
-     }
+    }
     if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp' && !e.repeat) {
       player.moving[0] = true
       player.moving[1] = false
@@ -146,53 +207,95 @@ s.next()
     }
   });
   let mousex, mousey = 0
-  /*canvas.addEventListener('mousemove',(e)=>{
-  
-    mousex=e.clientX
-    mousey=e.clientY
-     let diffx = player.x - mousex,
-     diffy = player.y - mousey
-    player.rot = -Math.atan2(diffx,diffy)
-  
-  })*/
+  canvas.addEventListener('mousemove', (e) => {
+
+    mousex = e.clientX
+    mousey = e.clientY
+
+  })
   const cwidth = 1366, cheight = 767
+  function search(type, loc){
+    let out = []
+for (let o of entity.all) {
+if (o instanceof type) {out.push(o)}
+}
+return out
+  }
   function update() {
+    requestAnimationFrame(update)
+
+    if (Clicking) {
+      clickTimer.tick()
+      if (clickTimer.done) {
+        Clicking = false;
+        clickTimer.reset()
+      }
+    }
     let l = false;
-    if (audios.music.currentTime >= 60.22 ){
+    if (audios.music.currentTime >= 60.22) {
       audios.music.currentTime = 0.12
-      audios.music.play() 
+      audios.music.play()
 
     }
-    requestAnimationFrame(update)
+
     /* let diffx = player.x - mousex,
      diffy = player.y - mousey
     player.rot = -Math.atan2(diffx,diffy)*/
     canvas.height = window.innerHeight;
     canvas.width = window.innerWidth;
+    if (currentLevel <= 10) {
+      ctx.fillStyle = '#8f91ff';
 
-    if (!paused) {
-      ctx.clearRect(0, 0, cwidth, cheight);
-      if (currentLevel < 6) {
-        ctx.fillStyle = '#8f91ff';
+    }
+    if (currentLevel > 10 && currentLevel <= 20) {
+      ctx.fillStyle = '#6f5cff';
 
+    }
+    if (currentLevel > 20 && currentLevel <= 30) {
+      ctx.fillStyle = '#ff4545';
+
+    }
+    ctx.clearRect(0, 0, cwidth, cheight);
+
+    ctx.fillRect(0, 0, cwidth, cheight);
+    ctx.font = "50px lexend";
+    ctx.textAlign = "center";
+
+    ctx.fillStyle = '#000000'
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    if (player.x && deaths > -1) ctx.fillText(`Deaths: ${deaths}`, canvas.width - 160, canvas.height - 40);
+    if (click) {
+      click.fp.x = window.innerWidth / 2
+      click.fp.y = (window.innerHeight / 2) + (2 * click.tmr.time) - 200
+      click.tmr.tick()
+    }
+    if (Math.abs(mousex - click.x) < click?.size && (Math.abs(mousey - click?.y) < click?.size)) {
+      click._color = '#4cdb2c'
+      if (Clicking) {
+        click.size = click.size * 0.9
+        StartGame()
       }
-      ctx.fillRect(0, 0, cwidth, cheight);
-      ctx.font = "50px Sans-serif";
-      ctx.textAlign = "center";
+    }
+    else {
+      click._color = '#db2c2c'
+    }
+    for (let o of clickable.buttons) {
+      o.draw()
+    }
+    if (!paused && menu.started) {
 
-      ctx.fillStyle = '#000000'
-      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-     ctx.fillText(`Deaths: ${deaths}`, canvas.width - 160, canvas.height - 40);
       if (entity.all.indexOf(player) !== entity.all.length - 1) {
         entity.all.splice(entity.all.indexOf(player), 1)
         entity.all.push(player)
       }
+
       for (let o of entity.tokill) {
         // the last frame has ended, kill all that needs to be killed before we start drawing again!
 
-       if (entity.all.includes(o)) { entity.all.splice(entity.all.indexOf(o), 1);
-        entity.particles.push(o)
-}
+        if (entity.all.includes(o)) {
+          entity.all.splice(entity.all.indexOf(o), 1);
+          entity.particles.push(o)
+        }
 
       }
       entity.tokill = [] //then empty it
@@ -205,10 +308,10 @@ s.next()
           oo.fireTime++
         }
         o.draw() //and draw :)
-      
+
       }
-      if (entity.all.includes(player) && !player.invuln) {
-l=true
+      if (entity.all.includes(player) && !player?.invuln) {
+        l = true
       }
       if (!l) {
         int.tick()
@@ -224,9 +327,9 @@ l=true
         if (currentLevel === 5) {
           o.size--
           o.rot -= 0.1
-          o.fp.x+= o.velocity.x*5
-          o.fp.y+= o.velocity.y*5
-       
+          o.fp.x += o.velocity.x * 5
+          o.fp.y += o.velocity.y * 5
+
         } else { o.size++ }
         o.speed = 0
         o.draw()
@@ -245,11 +348,11 @@ l=true
       case 5: {
         if (gameStart) {
 
-          if (!flags.managerSpawned || !entity.all.some((o)=>{
-return o instanceof manager
-          })) {
-            let f = new manager(cwidth / 2, flags.init ? 101 : 0);
-            f.chosen = 3
+          if (!flags.managerSpawned || !entity.all.some((o) => 
+             o instanceof manager
+          )) {
+           if (search(checkPoint).length===0) {let f = new manager(cwidth / 2, flags.init ? 101 : 0);             f.chosen = 3
+}
           }
           if (flags.colorsNeeded > 0) {
             if (player.x < 323 || player.x > 1020 || player.y < 140) {
@@ -267,22 +370,30 @@ return o instanceof manager
   }
 
   //x.lifetime = 4
+  let click = new clickable(window.innerWidth / 2, window.innerHeight / 2, 100)
+  click._color = '#db2c2c'
   function nextFrame() {
     paused = false;
     update()
     paused = true;
   }
-  let player
+  let player = new entity(NaN, NaN, 24, 4,)
 
   requestAnimationFrame(update)
   function spawnPlayer(x, y) {
-    for (let o of entity.all) {
-      o.beforePlayerRespawn?.()
+    if (player) {
+      if (deaths > -1 && audios.death.paused) {
+
+        audios.death.play();
+
+      }
+      for (let o of entity.all) {
+        o.beforePlayerRespawn?.()
+      }
     }
     player = new entity(x, y, 13, 4)
     deaths++
-    player.coinsNeeded = 0;
-    player.color = "#ff2323"
+    player._color = "#ff2323"
     player.speed = 7.3
     player.isPlayer = true
     player.type = 'player'
@@ -298,7 +409,6 @@ return o instanceof manager
       if (o instanceof coin) {
         o.o = 10;
         o.invuln = false;
-        player.coinsNeeded++
       }
     }
   }
@@ -317,7 +427,6 @@ return o instanceof manager
       text = err
     }
   }
-  level.next()
+  //  level.next()
 
 </script>
-<button onclick="d(document.getElementById('evil').value)">Eval</button>
