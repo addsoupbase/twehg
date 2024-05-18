@@ -163,15 +163,7 @@
     /*if (e.key === 'Shift') {
       player.invincible = !player.invincible
     }*/
-    if (e.key === 'o') {
-      player.kill()
-    }
-    if (e.key === 'k') {
-      entity.clear(true)
 
-      level.next()
-      currentLevel++
-    }
     if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp' && !e.repeat) {
       player.moving[0] = true
       player.moving[1] = false
