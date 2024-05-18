@@ -34,6 +34,7 @@ function darkenHexColor(hex, percent) {
         return hex.length === 1 ? '0' + hex : hex;
     }).join('');
 }
+
 class entity {
     static all = []
     static tokill = []
@@ -42,6 +43,8 @@ class entity {
         x: 0,
         y: 0
     }
+    #started = false
+
     static clear = function (type) {
         for (let o of entity.all) {
             if (!o.isPlayer) {
@@ -52,11 +55,15 @@ class entity {
         }
     }
     constructor(x, y, size, shape) {
+
         this.x = x || 0;
         this.y = y || 0;
+        this.inTurret = false
         this.shape = shape;
-        this.coinsNeeded = 0;
-
+        this.assumed = {
+            x:0,
+            y:0
+        }
         this.goesBackToStart = false
         this.maxHp = 1;
         this.activated = false;
@@ -76,15 +83,16 @@ class entity {
         }
         this.o = 10
         this.speed = this.width = this.height = 1
-        this.color = '#000000'
+        this.color = this._color = '#000000'
+        this.darkColor = darkenHexColor(this.color, 60)
         this.firing = false;
         this.invincible = false;
         this.fp = {
             x: this.x,
             y: this.y
         }
-
-        this.velocity = {
+   
+                this.velocity = {
             x: 0,
             y: 0,
             a: 0, //angular velocity
@@ -105,6 +113,36 @@ class entity {
         this.moving = [false, false, false, false]
         entity.all.push(this) //we now exist according to the game
     }
+    get index() {
+        return entity.all.indexOf(this)
+
+    }
+    get index2() {
+        return entity.particles.indexOf(this)
+
+    }
+    collideExit(coll) {
+        if (this === player && coll instanceof playerTurret) {
+            this.rot = 0
+            this.inTurret=false
+        }
+    }
+    #Start() {
+
+        this.start = {
+            x: this.x,
+            y: this.y,
+            rot: this.rot,
+            color: this.color,
+            velocity: {
+                x: this.velocity.x,
+                y: this.velocity.y,
+                a: this.velocity.a
+            },
+            speed: this.speed,
+            size: this.size,
+        }
+    }
     kill() {
         if (this.invuln) { return }
         this.invuln = true
@@ -116,8 +154,17 @@ class entity {
         this.x = this.fp.x = x;
         this.y = this.fp.y = y
     }
+
+    set _color(col) {
+        this.color = col;
+        this.darkColor = darkenHexColor(this.color, 60)
+    }
     newPos() {
-        if (entity.all.indexOf(player) < 0 && this !== player) {
+        if (!this.#started) {
+            this.#started = true;
+            this.#Start?.()
+        }
+        if (player.index < 0 && this !== player) {
             this.onPlayerDied?.()
         }
         if (this.grows) {
@@ -140,28 +187,31 @@ class entity {
                 o.fire()
             }
         }
-        if (buttonPressed&&!this.activated) {
-            this.activated=true
+        if (buttonPressed && !this.activated) {
+            this.activated = true
             this.activate?.('on')
         }
-        else if (!buttonPressed&&this.activated) {
-            this.activated=false
+        else if (!buttonPressed && this.activated) {
+            this.activated = false
             this.activate?.('off')
+        }
+        if (this.inTurret) {
+            this.velocity.x = this.velocity.y = 0   
         }
         if (this.isPlayer) {
             if (this.moving[1] && !this.moving[0]) {
-                this.velocity.y = this.speed
+               this.inTurret ? this.assumed.y += this.speed : this.velocity.y = this.speed
             } else if (!this.moving[1] && this.moving[0]) {
-                this.velocity.y = -this.speed
+               this.inTurret ? this.assumed.y  -= this.speed: this.velocity.y = -this.speed
             } else {
-                this.velocity.y = 0
+               this.inTurret ? this.assumed.y: this.velocity.y = 0
             }
             if (this.moving[2] && !this.moving[3]) {
-                this.velocity.x = this.speed
+               this.inTurret ? this.assumed.x  += this.speed: this.velocity.x = this.speed
             } else if (!this.moving[2] && this.moving[3]) {
-                this.velocity.x = -this.speed
+              this.inTurret ? this.assumed.x -= this.speed :  this.velocity.x = -this.speed
             } else {
-                this.velocity.x = 0
+               this.inTurret ? this.assumed.x : this.velocity.x = 0
             }
         }
         if (this.velocity.x > this.speed * this.maxSpeed) { this.velocity.x = this.speed * this.maxSpeed }
@@ -244,7 +294,7 @@ class entity {
         for (let o of entity.all) {
             if (o === this) {
                 continue
-            } else if (entity.particles.indexOf(this) >= 0 || this.invincible) {
+            } else if (this.index2 >= 0 || this.invincible) {
                 break
             } else {
                 let diff = {
@@ -253,6 +303,13 @@ class entity {
                 }
                 if (diff.x < o.size && diff.y < o.size && !this.invuln && !o.invuln) {
                     o.collide?.(this)
+                    o.colliding = true
+                    this.colliding=true
+                }
+                else {
+                   if (this.colliding) { this.collideExit?.(o)
+                    this.colliding = false
+                    o.colliding = false}
                 }
             }
         }
@@ -278,7 +335,7 @@ class entity {
             if (g.r < 1) {
                 g.r += 0.08
             }
-            ctx.strokeStyle = darkenHexColor(g.color, 60)
+            ctx.strokeStyle = g.darkColor
 
             ctx.rotate(g.angle)
             ctx.fillStyle = g.color
@@ -293,10 +350,12 @@ class entity {
 
         ctx.restore()
         ctx.beginPath()
-        ctx.strokeStyle = darkenHexColor(this.color, 60)
+        ctx.strokeStyle = this.darkColor
 
         ctx.fillStyle = this.color
-
+        if (this.inTurret) {
+            ctx.rotate(toRad(45))
+        }
         if (!this.shape) {
             //the circle
             ctx.arc(0, 0, this.size, 0, 2 * Math.PI);
@@ -309,9 +368,15 @@ class entity {
 
             ctx.fill()
             ctx.closePath()
+        } else if (this.shape === 'quarter') {
+            ctx.rotate(toRad(180 + 45))
+            ctx.arc(0, 0, this.size, 0, 1.5 * Math.PI)
+            ctx.lineTo(0, 0)
+            ctx.closePath()
+            ctx.fill()
         }
         else {
-            ctx.rotate(toRad(45))
+            ctx.rotate(toRad(-45))
             ctx.moveTo(0 + (size * 1.4) * Math.cos(0), 0 + (size * 1.4) * Math.sin(0));
             for (var i = 1; i <= this.shape; i++) {
                 ctx.lineTo(0 + (size * 1.4) * Math.cos(i * 2 * Math.PI / this.shape), 0 + (size * 1.4) * Math.sin(i * 2 * Math.PI / this.shape));
@@ -335,11 +400,30 @@ class entity {
          }*/
     }
 }
+
+class clickable extends entity {
+    static buttons = []
+    constructor(x, y, size) {
+        super(x, y, size)
+        this.tmr = new timer(100)
+
+        this.shape = 4
+        clickable.buttons.push(this)
+    }
+
+    draw() {
+        super.draw()
+        ctx.font = "50px Lexend";
+
+        ctx.fillText('START', this.x, this.y + this.size / 2)
+
+    }
+}
 class wall extends entity {
     constructor(x, y, size, shape) {
         super(x, y, size, shape)
         if (currentLevel < 6) {
-            this.color = colors.blue
+            this._color = colors.blue
         }
     }
     collide(coll) {
@@ -432,7 +516,7 @@ class enemy extends entity {
 class tracking extends enemy {
     constructor(x, y, size, shape) {
         super(x, y, size, shape)
-        this.color = '#00e4ff'
+        this._color = '#00e4ff'
         this.speed = 10
 
         this.maxSpeed = 0.5
@@ -455,7 +539,7 @@ class tracking extends enemy {
              if (Math.abs(this.velocity.y) > this.speed && this.velocity.y < 0) {this.velocity.y=-this.speed}
              */
 
-        if (!this.target || entity.all.indexOf(this.target) < 0) {
+        if (!this.target || !this.target.index) {
             for (let o of entity.all) {
                 if (o.isPlayer) {
                     this.target = o
@@ -550,10 +634,10 @@ class spawner extends enemy {
         }
     }
     fire() {
-        let f = new tracking(this.x, this.y, 7, 3)
-        f.velocity.x = ran.range(-f.speed, f.speed)
-        f.velocity.y = ran.range(-f.speed, f.speed)
-        f.color = this.color
+        let ff = new tracking(this.x, this.y, 7, 3)
+        ff.velocity.x = ran.range(-f.speed, f.speed)
+        ff.velocity.y = ran.range(-f.speed, f.speed)
+        ff._color = this.color
     }
     collide(coll) {
         if (coll === player) {
@@ -568,19 +652,19 @@ class box extends entity {
         super(x, y, size)
         this.shape = 4;
         this.goesBackToStart = true
-        this.color = '#965318'
+        this._color = '#965318'
     }
     onPlayerDied() {
         this.fp.x = this.start.x;
         this.fp.y = this.start.y
 
     }
-    activate(type){
+    activate(type) {
         if (type === 'on') {
-this.velocity.y = 1
+            this.velocity.y = 1
         }
         else if (type === 'off') {
-this.velocity.y = -1
+            this.velocity.y = -1
         }
     }
     kill(type) {
@@ -649,7 +733,7 @@ this.velocity.y = -1
         ctx.save()
         ctx.beginPath()
         ctx.lineWidth = 4
-        ctx.strokeStyle = darkenHexColor(this.color, 60)
+        ctx.strokeStyle = this.darkColor
         ctx.translate(this.x, this.y)
         ctx.rotate(this.rot)
 
@@ -666,27 +750,32 @@ this.velocity.y = -1
 class checkPoint extends entity {
     constructor(x, y, size) {
         super(x, y, size)
-        this.color = '#07f700'
+        this._color = '#07f700'
         this.shape = 4
+        this.darkColor = this.color
 
     }
 
     collide(coll) {
         if (coll === player) {
-            if (!player.coinsNeeded) {
+            if (!entity.all.some((o)=>o instanceof coin && o.o !== 0)) {
                 player.o = 0
-                entity.clear(true);
 
                 text = messages[c++]
+                audios.bell.play()
+                entity.clear(true);
+
                 setTimeout(() => {
+                    entity.clear(true);
+
                     if (level.next().done) {
-                        let f = new enemy(cwidth / 2, cheight / 2, 10, 0); f.color = '#0700f7';
+                        let f = new enemy(cwidth / 2, cheight / 2, 10, 0); f._color = '#0700f7';
                         let n = new wall((cwidth / 2) + 40, cheight / 2, wallSize, 4)
                         new box((cwidth / 2) + 60, cheight / 2, 20)
                         new turret(600, 200, 20, '#ff5500', 100)
                         new button(700, 200, 10, null)
                         text = '(that was the last level for now)'
-                        n.color = '#7a7a7a'
+                        n._color = '#7a7a7a'
                     }
                     currentLevel++
                     text = ''
@@ -734,10 +823,15 @@ class gun {
         this.r = 1
         this.reload = reload || 1
         this.fireTime = this.reload;
-        this.color = color
-
+        this._color = this.color = color
+        this.darkColor = darkenHexColor(this.color, 60)
         this.parent = parent
         this.parent.guns.push(this)
+    }
+    set _color(col) {
+        this.color = col;
+        this.darkColor = darkenHexColor(this.color)
+
     }
     fire(b) {
         if (this.fireTime >= this.reload) {
@@ -754,7 +848,7 @@ class gun {
             fired.velocity.y = this.speed * Math.sin(this.angle + this.parent.rot + toRad(90)); // Use gun's angle here as well
             fired.fp.x = fired.x = this.parent.x + offsetX;
             fired.fp.y = fired.y = this.parent.y + offsetY;
-            fired.color = this.parent.color
+            fired._color = this.parent.color
 
         }
     }
@@ -764,7 +858,7 @@ class turret extends entity {
     constructor(x, y, size, color, range) {
         super(x, y, size, color)
         this.shape = 4;
-        this.color = color
+        this._color = this.color = color
         this.range = range
         this.goesBackToStart = true;
         let f = new gun(0, 0, 10, 20, 10, 40, this.color, this, 8)
@@ -801,7 +895,7 @@ class turret extends entity {
         this.firing = true;
         super.newPos()
 
-        if (entity.all.indexOf(this.target) < 0) {
+        if (!this.target?.index) {
             this.target = player
         }
 
@@ -827,6 +921,44 @@ class turret extends entity {
         }
     }
 }
+class playerTurret extends turret {
+    constructor(x, y, size, color) {
+        super(x, y, size, color)
+        this.shape = 'quarter';
+        this.guns = []
+        this._color = this.color = '#ff00c3'
+        this.darkColor = darkenHexColor(this.color, 60)
+        this.colliding = false;
+        this.goesBackToStart = true;
+        //  let f = new gun(0, 0, 10, 20, 10, 40, this.color, this, 8)
+        // f.collisionType = 'damage'
+        this.invuln = false;
+    }
+    collide(coll) {
+        if (coll === player) {
+            if (!this.colliding) {
+                coll.fp.x = coll.x = this.x-coll.size
+                coll.fp.y = coll.y = this.y-coll.size
+
+            }
+            else {
+                coll.fp.x = this.x - Math.cos(this.rot)
+                coll.fp.y = this.y - Math.sin(this.rot)
+
+            }
+            coll.rot = Math.atan2(this.y - coll.y, this.x - coll.x)
+            this.colliding = true;
+            player.inTurret = true
+        }
+
+    }
+    newPos() {
+        if (this.colliding) {
+            this.rot = player.rot
+        }
+    }
+}
+
 class button extends entity {
     constructor(x, y, size, func) {
         super(x, y, size)
@@ -843,11 +975,11 @@ class button extends entity {
     }
     draw() {
         if (buttonPressed) {
-            this.color = '#34fa42'
+            this._color = '#34fa42'
             this.size = this.start.size * 0.9
         }
         else {
-            this.color = '#ff5e5e'
+            this._color = '#ff5e5e'
             this.size = this.start.size
         }
         super.draw()
@@ -857,26 +989,29 @@ class coin extends entity {
     constructor(x, y) {
         super(x, y)
         this.size = 8;
-        this.color = '#d9fa02'
+        this._color = '#d9fa02'
         this.shape = 0;
         this.goesBackToStart = true;
-        player.coinsNeeded++
     }
     collide(coll) {
         if (coll === player) {
             this.o = 0;
             this.invuln = true;
-            console.log('gotted')
-            player.coinsNeeded--
+            console.log('%c ding', 'font-size: 30px; color: yellow')
+            audios.ding.currentTime = 0
+
+            audios.ding.play()
+
         }
     }
 
 
 }
 class block extends entity {
+    static colors = ['#9327e6', '#e62767', '#3fe03f', '#d0e03f', '#e0853f']
     constructor(x, y, size) {
         super(x, y, size)
-        this.color = ran.choose('#9327e6', '#e62767', '#3fe03f', '#d0e03f', '#e0853f')
+        this._color = ran.choose(...block.colors)
         this.shape = 4;
         this.velocity.y = 7
         this.colorChosen = true;
@@ -911,9 +1046,9 @@ class manager extends entity {
         super(x, y)
         this.size = 13
         this.invuln = true;
-        this.color = '#000b9e'
+        this._color = '#0a6bfc'
         this.chosen = null
-        
+
         this.shape = 4
         this.velocity.y = 4
         this.timers = {
@@ -922,12 +1057,20 @@ class manager extends entity {
             cycleTime: new timer(100),
 
         }
-   
+
         flags.managerSpawned = true;
     }
     choose(color, final) {
-        if (color === this.chosen && !final) {
-            return this.choose(ran.choose('#9327e6', '#e62767', '#3fe03f', '#d0e03f', '#e0853f'))
+        try {
+            if (color === this.chosen && !final) {
+let b = search(block)
+                return this.choose(b[Math.floor(Math.random() * b.length)].color)
+
+            }
+        }
+        catch (e) {
+            flags.gameEnded = true;
+            flags.colorsNeeded = 0
         }
         if (!final) {
             for (let o of entity.all) {
@@ -935,7 +1078,7 @@ class manager extends entity {
                     o.colorChosen = true;
                 }
             }
-            this.color = this.chosen = color;
+            this._color = this.chosen = color;
 
         }
         else {
@@ -955,7 +1098,7 @@ class manager extends entity {
         flags.colorsNeeded = 5;
         this.timers.pickTime.reset()
         this.timers.moveTime.reset(200)
-        this.color = '#000b9e'
+        this._color = this.start.color
         for (let o of entity.all) {
             if (o instanceof block) {
                 o.colorChosen = true
@@ -970,19 +1113,21 @@ class manager extends entity {
         }
         if (!this.velocity.y && !this.timers.pickTime.done) {
             this.timers.pickTime.tick()
-            
+
 
         }
         if (flags.colorsNeeded !== 0) {
             if (this.timers.pickTime.done && !this.timers.moveTime.time) {
-                this.choose(ran.choose('#9327e6', '#e62767', '#3fe03f', '#d0e03f', '#e0853f'))
-               
+                let b = search(block)
+
+                this.choose(b[Math.floor(Math.random() * b.length)].color)
+
             }
             if (this.timers.pickTime.done && !this.timers.moveTime.done) {
                 this.timers.moveTime.tick()
             }
-            if (this.timers.moveTime.done && this.timers.pickTime.done) {            
-                this.timers.moveTime.reset(40+(flags.colorsNeeded * 30))
+            if (this.timers.moveTime.done && this.timers.pickTime.done) {
+                this.timers.moveTime.reset(40 + (flags.colorsNeeded * 30))
                 this.timers.pickTime.reset()
                 this.choose(this.chosen, true)
                 flags.colorsNeeded--
@@ -1015,17 +1160,17 @@ class manager extends entity {
                     for (let i = 0; i < d.length; i++) {
                         switch (d[i].color) {
                             case '#ff6b6b':
-                                d[i].color = '#6b93ff'
+                                d[i]._color = '#6b93ff'
                                 break;
 
                             case '#6b93ff':
-                                d[i].color = '#ff6b6b'
+                                d[i]._color = '#ff6b6b'
                                 break;
 
 
                         }
 
-                        if (d[i].color !== '#ff6b6b' && d[i].color !== '#6b93ff') i % 2 === 1 ? d[i].color = '#ff6b6b' : d[i].color = '#6b93ff'
+                        if (d[i].color !== '#ff6b6b' && d[i].color !== '#6b93ff') i % 2 === 1 ? d[i]._color = '#ff6b6b' : d[i]._color = '#6b93ff'
                     }
                 }
             }
@@ -1053,7 +1198,7 @@ class manager extends entity {
 }
 class timer {
     constructor(limit, func) {
-        this.limit = +(limit-1) || 1
+        this.limit = +(limit - 1) || 1
         this.time = 0;
         this.func = func
         this.done = false
@@ -1069,23 +1214,23 @@ class timer {
             return this.done = false;
 
         }
-        else if (this.time === this.limit){
+        else if (this.time === this.limit) {
             this.func?.()
             this.time++
             return this.done = true
         }
-       
+
     }
 }
 class blade extends entity {
-    constructor(x,y,size) {
-        super(x,y,size)
+    constructor(x, y, size) {
+        super(x, y, size)
         this.shape = 3;
-        this.color = '#0700f7'
+        this._color = '#0700f7'
         this.velocity.a = 0.1
-        let f = new entity(this.x,this.y,this.size,this.shape,3)
-        f.color = this.color
-        f.velocity.a = -0.1 
+        let ff = new entity(this.x, this.y, this.size, this.shape, 3)
+        ff._color = this.color
+        ff.velocity.a = -0.1
     }
     collide(coll) {
         if (coll === player) {
@@ -1094,16 +1239,16 @@ class blade extends entity {
     }
 }
 class swirl extends enemy {
-    constructor(x,y,size,shape,speed){
-        super(x,y,size,shape)
+    constructor(x, y, size, shape, speed) {
+        super(x, y, size, shape)
         this.speed = speed;
         this.velocity.a = 0.1
-        this.color = '#0700f7'
+        this._color = '#0700f7'
 
     }
-    newPos(){
+    newPos() {
         super.newPos()
-        this.velocity.x = Math.cos(this.rot)*this.speed;
-        this.velocity.y = Math.sin(this.rot)*this.speed
+        this.velocity.x = Math.cos(this.rot) * this.speed;
+        this.velocity.y = Math.sin(this.rot) * this.speed
     }
 }
